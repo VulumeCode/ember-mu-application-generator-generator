@@ -28,15 +28,109 @@ from sklearn.externals import joblib
 
 import unicodedata
 
+from SPARQLWrapper import SPARQLWrapper, JSON
+
+
+
+
 plt.style.use(['dark_background'])
 pd.set_option('display.max_colwidth', -1)
 
 app = Flask(__name__)
 
 
+@app.route('/test')
+def test():
+    print('Querying')
+    start = timer()
+    sparql = SPARQLWrapper("http://sem-eurod01.tenforce.com:8890/sparql")
+    sparql.setQuery("""
+        prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        prefix qb: <http://purl.org/linked-data/cube#>
+        prefix eurostat: <http://data.europa.eu/eurostat/ns/>
+        prefix skos: <http://www.w3.org/2004/02/skos/core#>
+        prefix dct: <http://purl.org/dc/terms/>
+        prefix schema: <http://schema.org/>
+        prefix sdmx-subject: <http://purl.org/linked-data/sdmx/2009/subject#>
+        prefix sdmx-concept: <http://purl.org/linked-data/sdmx/2009/concept#>
+        prefix sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+        prefix interval: <http://reference.data.gov.uk/def/intervals/>
+        prefix offer: <http://data.europa.eu/eurostat/id/offer/>
+
+        select ?GTINdesc ?GTIN ?ISBA ?ISBAdesc ?ESBA ?ESBAdesc ?UUID where{
+         ?obs eurostat:product ?offer.
+         ?offer a schema:Offer;
+           <http://mu.semte.ch/vocabularies/core/uuid> ?UUID;
+           schema:description ?GTINdesc;
+           schema:gtin13 ?GTIN;
+           schema:category ?ISBA.
+         ?ISBA skos:prefLabel ?ISBAdesc.
+         ?obs eurostat:classification ?ESBA.
+         ?ESBA skos:prefLabel ?ESBAdesc.
+         ?obs qb:dataSet ?dataset.
+         ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/470111>
+        }
+    """)
+    sparql.setReturnFormat(JSON)
+    results = sparql.query().convert()
+
+    data = []
+    for result in results["results"]["bindings"]:
+        record = {}
+        try: record["ISBA"] = result["ISBA"]["value"]
+        except: pass
+        try: record["ISBA-desc"] = result["ISBAdesc"]["value"]
+        except: pass
+        try: record["ESBA"] = result["ESBA"]["value"]
+        except: pass
+        try: record["ESBA-desc"] = result["ESBAdesc"]["value"]
+        except: pass
+        try: record["GTIN"] = result["GTIN"]["value"]
+        except: pass
+        try: record["GTIN-desc"] = result["GTINdesc"]["value"]
+        except: pass
+        try: record["UUID"] = result["UUID"]["value"]
+        except: pass
+
+        if record not in data:
+            data.append(record)
+        else:
+            # print(record)
+            continue
+
+    for row in data:
+        desc = (" ").join(
+                         row["ESBA-desc"].lower().split()
+                         + row["GTIN-desc"].lower().split()
+                        )
+        row["prod-desc"] = unicodedata.normalize('NFKD',desc).encode('ASCII', 'ignore').decode('utf-8')
+    stop = timer()
+    print("Queried in", stop - start)
+
+    split = int(len(data)*0.90)
+    shuffle(data)
+    training = data[:split]
+    production = data[split:]
+
+    # No cheating!
+    for x in production:
+        del x["ISBA-desc"]
+        del x["ISBA"]
+
+    GTINvoc = buildVoc(data)
+
+    buildFeatureVectors(data, GTINvoc)
+
+    results = predict(training, production)
+
+
+    return jsonify(results)
+
 
 @app.route('/mock')
 def mock():
+
     data = readFromCSV('scannerdata/clean0329_ah.csv')
 
     split = int(len(data)*0.90)
@@ -91,16 +185,17 @@ def readFromCSV(filename):
                 except: pass
                 try: record["ISBA"] = row["ISBA"]
                 except: pass
-                try: record["ISBA-desc"] = row["ISBA-description"].lower()
+                try: record["ISBA-desc"] = row["ISBA-description"]
                 except: pass
                 try: record["ESBA"] = row["ESBA"]
                 except: pass
-                try: record["ESBA-desc"] = row["ESBA-description"].lower()
+                try: record["ESBA-desc"] = row["ESBA-description"]
                 except: pass
                 try: record["GTIN"] = row["GTIN"]
                 except: pass
-                try: record["GTIN-desc"] = row["GTIN-description"].lower() + " " + row["UNIT"].lower()
+                try: record["GTIN-desc"] = row["GTIN-description"] + " " + row["UNIT"]
                 except: pass
+                record["UUID"] = "MOCKUUID"
 
                 if record not in data:
                     data.append(record)
@@ -110,8 +205,8 @@ def readFromCSV(filename):
 
     for row in data:
         desc = (" ").join(
-                         row["ESBA-desc"].split()
-                         + row["GTIN-desc"].split()
+                         row["ESBA-desc"].lower().split()
+                         + row["GTIN-desc"].lower().split()
                         )
         row["prod-desc"] = unicodedata.normalize('NFKD',desc).encode('ASCII', 'ignore').decode('utf-8')
 
@@ -188,7 +283,7 @@ def predict(training, production):
     Output: 'ISBA-desc'
     """
     # Train the model
-    targetField = "ISBA-desc"
+    targetField = "ISBA"
 
     model = RandomForestClassifier(n_estimators=100) #, class_weight="balanced")
 
@@ -227,7 +322,7 @@ def predict(training, production):
         productionSample[idx_x] = x['feat-vec']
 
     def guessesTop(probs,classes):
-        guesses = [{'isba_uuid': 1234, 'isba_label':isba, 'value':prob} for isba,prob in zip(classes, probs)]
+        guesses = [{'isba_id': isba, 'isba_label':isba, 'value':prob} for isba,prob in zip(classes, probs)]
         guesses = (sorted(guesses, key=lambda r:r['value']))[-5:]
         guesses.reverse()
         return guesses
@@ -242,7 +337,7 @@ def predict(training, production):
     for x, probs in zip(production, probss):
         top = guessesTop(probs,model.classes_)
         result = {
-            "uuid":1234,
+            "uuid":x['UUID'],
             "product":x['GTIN-desc'],
             "GTIN":x['GTIN'],
             "ESBA":x['ESBA'],
