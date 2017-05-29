@@ -280,7 +280,7 @@ def predict(training, production):
     """
     Train the model on 'training' to make predictions for 'production'.
     Input:  'feat-vec'
-    Output: 'ISBA-desc'
+    Output: 'ISBA'
     """
     # Train the model
     targetField = "ISBA"
@@ -322,7 +322,7 @@ def predict(training, production):
         productionSample[idx_x] = x['feat-vec']
 
     def guessesTop(probs,classes):
-        guesses = [{'isba_id': isba, 'isba_label':isba, 'value':prob} for isba,prob in zip(classes, probs)]
+        guesses = [{'isba_id': isba, 'isba_label':isba_label(isba), 'value':prob} for isba,prob in zip(classes, probs)]
         guesses = (sorted(guesses, key=lambda r:r['value']))[-5:]
         guesses.reverse()
         return guesses
@@ -349,6 +349,32 @@ def predict(training, production):
     return results
 
 
+isba_labels = {}
+def isba_label(key):
+    """
+    Fetch and memoize isba labels. 
+    """
+    global isba_labels
+    if not isba_labels:
+        print('Querying ISBA metadata')
+        start = timer()
+        sparql = SPARQLWrapper("http://sem-eurod01.tenforce.com:8890/sparql")
+        sparql.setQuery("""
+            prefix schema: <http://schema.org/>
+            prefix offer: <http://data.europa.eu/eurostat/id/offer/>
+
+            select distinct ?ISBA ?ISBAdesc where{
+             ?offer a schema:Offer;
+               schema:category ?ISBA.
+             ?ISBA skos:prefLabel ?ISBAdesc.
+            }
+        """)
+        sparql.setReturnFormat(JSON)
+        results = sparql.query().convert()
+        isba_labels = {result["ISBA"]["value"]: result["ISBAdesc"]["value"] for result in results["results"]["bindings"]}
+        stop = timer()
+        print("Queried ISBA metadata in", stop - start)
+    return isba_labels[key]
 
 if __name__ == "__main__":
     app.run()
