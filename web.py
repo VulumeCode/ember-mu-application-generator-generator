@@ -64,8 +64,7 @@ def test():
            <http://mu.semte.ch/vocabularies/core/uuid> ?UUID;
            schema:description ?GTINdesc;
            schema:gtin13 ?GTIN;
-           schema:category ?ISBA.
-         ?ISBA skos:prefLabel ?ISBAdesc.
+           schema:category ?ISBA. # TODO Optional
          ?obs eurostat:classification ?ESBA.
          ?ESBA skos:prefLabel ?ESBAdesc.
          ?obs qb:dataSet ?dataset.
@@ -79,8 +78,6 @@ def test():
     for result in results["results"]["bindings"]:
         record = {}
         try: record["ISBA"] = result["ISBA"]["value"]
-        except: pass
-        try: record["ISBA-desc"] = result["ISBAdesc"]["value"]
         except: pass
         try: record["ESBA"] = result["ESBA"]["value"]
         except: pass
@@ -114,16 +111,14 @@ def test():
     production = data[split:]
 
     # No cheating!
-    for x in production:
-        del x["ISBA-desc"]
-        del x["ISBA"]
+    # for x in production:
+    #     del x["ISBA"]
 
     GTINvoc = buildVoc(data)
 
     buildFeatureVectors(data, GTINvoc)
 
     results = predict(training, production)
-
 
     return jsonify(results)
 
@@ -139,10 +134,10 @@ def mock():
     production = data[split:]
 
     # No cheating!
-    for x in production:
-        del x["ISBA-desc"]
-        del x["ISBA"]
-        del x["ECOICOP"]
+    # for x in production:
+    #     del x["ISBA-desc"]
+    #     del x["ISBA"]
+    #     del x["ECOICOP"]
 
     GTINvoc = buildVoc(data)
 
@@ -344,6 +339,12 @@ def predict(training, production):
             "ESBA-desc":x['ESBA-desc'],
             "predictions":top
         }
+        try:
+            result['classification'] = {
+                "isba_id": x["ISBA"],
+                "isba_label": isba_label(x["ISBA"])
+            }
+        except: pass
         results.append(result)
 
     return results
@@ -352,7 +353,7 @@ def predict(training, production):
 isba_labels = {}
 def isba_label(key):
     """
-    Fetch and memoize isba labels. 
+    Fetch and memoize isba labels.
     """
     global isba_labels
     if not isba_labels:
