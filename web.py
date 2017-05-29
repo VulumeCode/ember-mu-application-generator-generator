@@ -33,6 +33,8 @@ pd.set_option('display.max_colwidth', -1)
 
 app = Flask(__name__)
 
+
+
 @app.route('/mock')
 def mock():
     data = readFromCSV('scannerdata/clean0329_ah.csv')
@@ -140,6 +142,9 @@ def buildVoc(data):
 
 
 def buildFeatureVectors(data, voc):
+    """
+    Adds the feature vector 'feat-vec' to all records in data, using the other fields and voc
+    """
     # Retrieve all stems from the voc in the string
     # Note: deduplicates words
     def stem(string, voc):
@@ -177,6 +182,11 @@ def buildFeatureVectors(data, voc):
         x['feat-vec'] = vectorizer.transform([x['feat-str']]).toarray()[0]
 
 def predict(training, production):
+    """
+    Train the model on 'training' to make predictions for 'production'.
+    Input:  'feat-vec'
+    Output: 'ISBA-desc'
+    """
     # Train the model
     targetField = "ISBA-desc"
 
@@ -242,3 +252,8 @@ def predict(training, production):
         results.append(result)
 
     return results
+
+
+
+if __name__ == "__main__":
+    app.run()
