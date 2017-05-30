@@ -58,13 +58,14 @@ def test():
         prefix interval: <http://reference.data.gov.uk/def/intervals/>
         prefix offer: <http://data.europa.eu/eurostat/id/offer/>
 
-        select ?GTINdesc ?GTIN ?ISBA ?ISBAdesc ?ESBA ?ESBAdesc ?UUID where{
+        select ?GTINdesc ?GTIN ?ISBA ?ISBAdesc ?ISBAUUID ?ESBA ?ESBAdesc  ?UUID where{
          ?obs eurostat:product ?offer.
          ?offer a schema:Offer;
            <http://mu.semte.ch/vocabularies/core/uuid> ?UUID;
            schema:description ?GTINdesc;
            schema:gtin13 ?GTIN;
            schema:category ?ISBA. # TODO Optional
+         ?ISBA <http://mu.semte.ch/vocabularies/core/uuid> ?ISBAUUID.
          ?obs eurostat:classification ?ESBA.
          ?ESBA skos:prefLabel ?ESBAdesc.
          ?obs qb:dataSet ?dataset.
@@ -77,7 +78,7 @@ def test():
     data = []
     for result in results["results"]["bindings"]:
         record = {}
-        try: record["ISBA"] = result["ISBA"]["value"]
+        try: record["ISBAUUID"] = result["ISBAUUID"]["value"]
         except: pass
         try: record["ESBA"] = result["ESBA"]["value"]
         except: pass
@@ -278,7 +279,7 @@ def predict(training, production):
     Output: 'ISBA'
     """
     # Train the model
-    targetField = "ISBA"
+    targetField = "ISBAUUID"
 
     model = RandomForestClassifier(n_estimators=100) #, class_weight="balanced")
 
@@ -317,7 +318,7 @@ def predict(training, production):
         productionSample[idx_x] = x['feat-vec']
 
     def guessesTop(probs,classes):
-        guesses = [{'isba_id': isba, 'isba_label':isba_label(isba), 'value':prob} for isba,prob in zip(classes, probs)]
+        guesses = [{'isba_uuid': isba, 'isba_label':isba_label(isba), 'value':prob} for isba,prob in zip(classes, probs)]
         guesses = (sorted(guesses, key=lambda r:r['value']))[-5:]
         guesses.reverse()
         return guesses
@@ -341,8 +342,8 @@ def predict(training, production):
         }
         try:
             result['classification'] = {
-                "isba_id": x["ISBA"],
-                "isba_label": isba_label(x["ISBA"])
+                "isba_uuid": x["ISBAUUID"],
+                "isba_label": isba_label(x["ISBAUUID"])
             }
         except: pass
         results.append(result)
@@ -364,15 +365,16 @@ def isba_label(key):
             prefix schema: <http://schema.org/>
             prefix offer: <http://data.europa.eu/eurostat/id/offer/>
 
-            select distinct ?ISBA ?ISBAdesc where{
+            select distinct ?ISBAUUID ?ISBAdesc where{
              ?offer a schema:Offer;
                schema:category ?ISBA.
              ?ISBA skos:prefLabel ?ISBAdesc.
+             ?ISBA <http://mu.semte.ch/vocabularies/core/uuid> ?ISBAUUID.
             }
         """)
         sparql.setReturnFormat(JSON)
         results = sparql.query().convert()
-        isba_labels = {result["ISBA"]["value"]: result["ISBAdesc"]["value"] for result in results["results"]["bindings"]}
+        isba_labels = {result["ISBAUUID"]["value"]: result["ISBAdesc"]["value"] for result in results["results"]["bindings"]}
         stop = timer()
         print("Queried ISBA metadata in", stop - start)
     return isba_labels[key]
