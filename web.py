@@ -115,7 +115,7 @@ def test():
         row["prod-desc"] = unicodedata.normalize('NFKD',desc).encode('ASCII', 'ignore').decode('utf-8')
     stop = timer()
     print("Queried in", stop - start)
-    print(data[0])
+    # print(data[0])
     split = int(len(data)*0.90)
     shuffle(data)
     training = data[:split]
@@ -330,6 +330,7 @@ def predict(training, production):
     def guessesTop(probs,classes):
         guesses = [{'isba_uuid': isba, 'isba_label':isba_label(isba), 'value':prob} for isba,prob in zip(classes, probs)]
         guesses = (sorted(guesses, key=lambda r:r['value']))[-5:]
+        guesses = list(filter(lambda r:r['value']>0, guesses))
         guesses.reverse()
         return guesses
 
