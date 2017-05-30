@@ -58,13 +58,18 @@ def test():
         prefix interval: <http://reference.data.gov.uk/def/intervals/>
         prefix offer: <http://data.europa.eu/eurostat/id/offer/>
 
-        select ?GTINdesc ?GTIN ?ISBA ?ISBAdesc ?ISBAUUID ?ESBA ?ESBAdesc  ?UUID where{
+        select ?GTINdesc ?GTIN ?ISBA ?ISBAdesc ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit where{
          ?obs eurostat:product ?offer.
          ?offer a schema:Offer;
            <http://mu.semte.ch/vocabularies/core/uuid> ?UUID;
            schema:description ?GTINdesc;
            schema:gtin13 ?GTIN;
-           schema:category ?ISBA. # TODO Optional
+           schema:category ?ISBA; # TODO Optional
+           schema:includesObject [
+                a schema:TypeAndQuantityNode;
+                schema:amountOfThisGood ?quantity;
+                schema:unitCode ?unit
+              ].
          ?ISBA <http://mu.semte.ch/vocabularies/core/uuid> ?ISBAUUID.
          ?obs eurostat:classification ?ESBA.
          ?ESBA skos:prefLabel ?ESBAdesc.
@@ -88,6 +93,10 @@ def test():
         except: pass
         try: record["GTIN-desc"] = result["GTINdesc"]["value"]
         except: pass
+        try: record["unit"] = result["unit"]["value"]
+        except: pass
+        try: record["quantity"] = result["quantity"]["value"]
+        except: pass
         try: record["UUID"] = result["UUID"]["value"]
         except: pass
 
@@ -101,11 +110,12 @@ def test():
         desc = (" ").join(
                          row["ESBA-desc"].lower().split()
                          + row["GTIN-desc"].lower().split()
+                         + row["unit"].lower().split()
                         )
         row["prod-desc"] = unicodedata.normalize('NFKD',desc).encode('ASCII', 'ignore').decode('utf-8')
     stop = timer()
     print("Queried in", stop - start)
-
+    print(data[0])
     split = int(len(data)*0.90)
     shuffle(data)
     training = data[:split]
@@ -338,6 +348,8 @@ def predict(training, production):
             "GTIN":x['GTIN'],
             "ESBA":x['ESBA'],
             "ESBA-desc":x['ESBA-desc'],
+            "unit":x['unit'],
+            "quantity":x['quantity'],
             "predictions":top
         }
         try:
