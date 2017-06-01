@@ -60,22 +60,25 @@ def test():
         prefix semtech: <http://mu.semte.ch/vocabularies/core/>
 
         select ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit where{
-         ?obs eurostat:product ?offer.
-         ?offer a schema:Offer;
-           semtech:uuid ?UUID;
-           schema:description ?GTINdesc;
-           schema:gtin13 ?GTIN.
-         optional {?offer schema:includesObject [
-                a schema:TypeAndQuantityNode;
-                schema:amountOfThisGood ?quantity;
-                schema:unitCode ?unit
-              ].}
-         optional {?offer schema:category ?ISBA.
-         ?ISBA semtech:uuid ?ISBAUUID.}
-         ?obs eurostat:classification ?ESBA.
-         ?ESBA skos:prefLabel ?ESBAdesc.
-         ?obs qb:dataSet ?dataset.
-         ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/demo>
+            ?obs eurostat:product ?offer.
+            ?offer a schema:Offer;
+                semtech:uuid ?UUID;
+                schema:description ?GTINdesc;
+                schema:gtin13 ?GTIN.
+            optional {
+                ?offer schema:includesObject [
+                    a schema:TypeAndQuantityNode;
+                    schema:amountOfThisGood ?quantity;
+                    schema:unitCode ?unit
+                ].}
+            optional {
+                ?offer schema:category ?ISBA.
+                ?ISBA semtech:uuid ?ISBAUUID.
+                }
+            ?obs eurostat:classification ?ESBA.
+            ?ESBA skos:prefLabel ?ESBAdesc.
+            ?obs qb:dataSet ?dataset.
+            ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/demo>
         }
     """)
     sparql.setReturnFormat(JSON)
@@ -358,7 +361,7 @@ def predict(training, production, targetField):
             "quantity": x['quantity'],
             "predictions":top
         }
-        if "classification" in result: 
+        if "classification" in result:
             result['classification'] = {
                 "isba_uuid": x["ISBAUUID"],
                 "isba_label": isba_label(x["ISBAUUID"])["label"],
