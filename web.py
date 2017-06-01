@@ -328,7 +328,7 @@ def predict(training, production, targetField):
     for idx_x, x in enumerate(production):
         productionSample[idx_x] = x['feat-vec']
 
-    def guessesTop(probs,classes, topN = 5):
+    def guessesTop(probs,classes, topN = 100):
         guesses =   [{'isba_uuid': isba,
                       'isba_label':isba_label(isba)["label"],
                       'notation':isba_label(isba)["notation"],
@@ -349,22 +349,21 @@ def predict(training, production, targetField):
     for x, probs in zip(production, probss):
         top = guessesTop(probs,model.classes_)
         result = {
-            "uuid":x['UUID'],
-            "product":x['GTIN-desc'],
-            "GTIN":x['GTIN'],
-            "ESBA":x['ESBA'],
+            "uuid":     x['UUID'],
+            "product":  x['GTIN-desc'],
+            "GTIN":     x['GTIN'],
+            "ESBA":     x['ESBA'],
             "ESBA-desc":x['ESBA-desc'],
-            "unit":x['unit'],
-            "quantity":x['quantity'],
+            "unit":     x['unit'],
+            "quantity": x['quantity'],
             "predictions":top
         }
-        try:
+        if "classification" in result: 
             result['classification'] = {
                 "isba_uuid": x["ISBAUUID"],
                 "isba_label": isba_label(x["ISBAUUID"])["label"],
                 "notation": isba_label(x["ISBAUUID"])["notation"]
             }
-        except: pass
         results.append(result)
 
     return results
