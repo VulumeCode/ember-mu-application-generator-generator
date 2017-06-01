@@ -59,7 +59,7 @@ def test():
         prefix offer: <http://data.europa.eu/eurostat/id/offer/>
         prefix semtech: <http://mu.semte.ch/vocabularies/core/>
 
-        select ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit where{
+        select ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training where{
             ?obs eurostat:product ?offer.
             ?offer a schema:Offer;
                 semtech:uuid ?UUID;
@@ -78,7 +78,8 @@ def test():
             ?obs eurostat:classification ?ESBA.
             ?ESBA skos:prefLabel ?ESBAdesc.
             ?obs qb:dataSet ?dataset.
-            ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/demo>
+            ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/demo>.
+            ?obs eurostat:training ?training.
         }
     """)
     sparql.setReturnFormat(JSON)
@@ -102,6 +103,8 @@ def test():
         try: record["quantity"] = result["quantity"]["value"]
         except: record["quantity"] = ""
         try: record["UUID"] = result["UUID"]["value"]
+        except: pass
+        try: record["training"] = result["training"]["value"] == "1"
         except: pass
 
         if record not in data:
@@ -128,7 +131,7 @@ def test():
     training = []
     production = []
     for row in data:
-        if "ISBAUUID" in row:
+        if row["training"]:
             training.append(row)
         else:
             production.append(row)
