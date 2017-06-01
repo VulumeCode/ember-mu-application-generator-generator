@@ -18,7 +18,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB, GaussianNB
 from sklearn.linear_model import LogisticRegression as LR
 from sklearn.neighbors import KNeighborsClassifier
-from random import shuffle
+from random import shuffle, random
 from pandas import DataFrame
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer, HashingVectorizer
@@ -57,24 +57,25 @@ def test():
         prefix sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
         prefix interval: <http://reference.data.gov.uk/def/intervals/>
         prefix offer: <http://data.europa.eu/eurostat/id/offer/>
+        prefix semtech: <http://mu.semte.ch/vocabularies/core/>
 
-        select ?GTINdesc ?GTIN ?ISBA ?ISBAdesc ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit where{
+        select ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit where{
          ?obs eurostat:product ?offer.
          ?offer a schema:Offer;
-           <http://mu.semte.ch/vocabularies/core/uuid> ?UUID;
+           semtech:uuid ?UUID;
            schema:description ?GTINdesc;
-           schema:gtin13 ?GTIN;
-           schema:category ?ISBA; # TODO Optional
-           schema:includesObject [
+           schema:gtin13 ?GTIN.
+         optional {?offer schema:includesObject [
                 a schema:TypeAndQuantityNode;
                 schema:amountOfThisGood ?quantity;
                 schema:unitCode ?unit
-              ].
-         ?ISBA <http://mu.semte.ch/vocabularies/core/uuid> ?ISBAUUID.
+              ].}
+         optional {?offer schema:category ?ISBA.
+         ?ISBA semtech:uuid ?ISBAUUID.}
          ?obs eurostat:classification ?ESBA.
          ?ESBA skos:prefLabel ?ESBAdesc.
          ?obs qb:dataSet ?dataset.
-         ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/470111>
+         ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/demo>
         }
     """)
     sparql.setReturnFormat(JSON)
@@ -94,9 +95,9 @@ def test():
         try: record["GTIN-desc"] = result["GTINdesc"]["value"]
         except: pass
         try: record["unit"] = result["unit"]["value"]
-        except: pass
+        except: record["unit"] = ""
         try: record["quantity"] = result["quantity"]["value"]
-        except: pass
+        except: record["quantity"] = ""
         try: record["UUID"] = result["UUID"]["value"]
         except: pass
 
@@ -115,28 +116,31 @@ def test():
         row["prod-desc"] = unicodedata.normalize('NFKD',desc).encode('ASCII', 'ignore').decode('utf-8')
     stop = timer()
     print("Queried in", stop - start)
-    # print(data[0])
-    split = int(len(data)*0.90)
-    shuffle(data)
-    training = data[:split]
-    production = data[split:]
 
-    # No cheating!
-    # for x in production:
-    #     del x["ISBA"]
+    # split = int(len(data)*0.90)
+    # shuffle(data)
+    # training = data[:split]
+    # production = data[split:]
+
+    training = []
+    production = []
+    for row in data:
+        if "ISBAUUID" in row:
+            training.append(row)
+        else:
+            production.append(row)
 
     GTINvoc = buildVoc(data)
 
     buildFeatureVectors(data, GTINvoc)
 
-    results = predict(training, production)
+    results = predict(training, production, "ISBAUUID")
 
     return jsonify(results)
 
 
 @app.route('/mock')
 def mock():
-
     data = readFromCSV('scannerdata/clean0329_ah.csv')
 
     split = int(len(data)*0.90)
@@ -154,7 +158,7 @@ def mock():
 
     buildFeatureVectors(data, GTINvoc)
 
-    results = predict(training, production)
+    results = predict(training, production, "ISBA-desc")
     return jsonify(results)
 
 @app.route('/file')
@@ -170,7 +174,7 @@ def file():
 
     buildFeatureVectors(data, GTINvoc)
 
-    results = predict(training, production)
+    results = predict(training, production, "ISBA-desc")
     return jsonify(results)
 
 
@@ -282,15 +286,12 @@ def buildFeatureVectors(data, voc):
     for x in data:
         x['feat-vec'] = vectorizer.transform([x['feat-str']]).toarray()[0]
 
-def predict(training, production):
+def predict(training, production, targetField):
     """
     Train the model on 'training' to make predictions for 'production'.
     Input:  'feat-vec'
     Output: 'ISBA'
     """
-    # Train the model
-    targetField = "ISBAUUID"
-
     model = RandomForestClassifier(n_estimators=100) #, class_weight="balanced")
 
     # model = LR(multi_class="multinomial", solver="lbfgs")
@@ -327,9 +328,13 @@ def predict(training, production):
     for idx_x, x in enumerate(production):
         productionSample[idx_x] = x['feat-vec']
 
-    def guessesTop(probs,classes):
-        guesses = [{'isba_uuid': isba, 'isba_label':isba_label(isba), 'value':prob} for isba,prob in zip(classes, probs)]
-        guesses = (sorted(guesses, key=lambda r:r['value']))[-5:]
+    def guessesTop(probs,classes, topN = 5):
+        guesses =   [{'isba_uuid': isba,
+                      'isba_label':isba_label(isba)["label"],
+                      'notation':isba_label(isba)["notation"],
+                      'value':prob}
+                    for isba,prob in zip(classes, probs)]
+        guesses = (sorted(guesses, key=lambda r:r['value']))[-topN:]
         guesses = list(filter(lambda r:r['value']>0, guesses))
         guesses.reverse()
         return guesses
@@ -356,7 +361,8 @@ def predict(training, production):
         try:
             result['classification'] = {
                 "isba_uuid": x["ISBAUUID"],
-                "isba_label": isba_label(x["ISBAUUID"])
+                "isba_label": isba_label(x["ISBAUUID"])["label"],
+                "notation": isba_label(x["ISBAUUID"])["notation"]
             }
         except: pass
         results.append(result)
@@ -378,7 +384,7 @@ def isba_label(key):
             prefix schema: <http://schema.org/>
             prefix offer: <http://data.europa.eu/eurostat/id/offer/>
 
-            select distinct ?ISBAUUID ?ISBAdesc where{
+            select distinct ?ISBA ?ISBAUUID ?ISBAdesc where{
              ?offer a schema:Offer;
                schema:category ?ISBA.
              ?ISBA skos:prefLabel ?ISBAdesc.
@@ -387,7 +393,12 @@ def isba_label(key):
         """)
         sparql.setReturnFormat(JSON)
         results = sparql.query().convert()
-        isba_labels = {result["ISBAUUID"]["value"]: result["ISBAdesc"]["value"] for result in results["results"]["bindings"]}
+        isba_labels =   {result["ISBAUUID"]["value"]:
+                            {"label":
+                                result["ISBAdesc"]["value"]
+                            , "notation":
+                                re.search("/([0-9]+)$",result["ISBA"]["value"])[1]}
+                        for result in results["results"]["bindings"]}
         stop = timer()
         print("Queried ISBA metadata in", stop - start)
     return isba_labels[key]
