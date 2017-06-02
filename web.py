@@ -40,7 +40,9 @@ app = Flask(__name__)
 
 
 @app.route('/test')
-def test():
+@app.route('/test/')
+@app.route('/test<path:supplier>')
+def test(supplier=None):
     print('Querying')
     start = timer()
     sparql = SPARQLWrapper("http://sem-eurod01.tenforce.com:8890/sparql")
