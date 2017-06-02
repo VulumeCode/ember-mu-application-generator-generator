@@ -90,7 +90,7 @@ def test():
         record = {}
         try: record["ISBAUUID"] = result["ISBAUUID"]["value"]
         except: pass
-        try: record["ESBA"] = result["ESBA"]["value"]
+        try: record["ESBA"] = re.search("/([0-9]+)$",result["ESBA"]["value"])[1]
         except: pass
         try: record["ESBA-desc"] = result["ESBAdesc"]["value"]
         except: pass
