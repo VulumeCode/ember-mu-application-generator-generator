@@ -41,7 +41,7 @@ app = Flask(__name__)
 
 @app.route('/test')
 @app.route('/test/')
-@app.route('/test<path:supplier>')
+@app.route('/test/<path:supplier>')
 def test(supplier=None):
     print('Querying')
     start = timer()
