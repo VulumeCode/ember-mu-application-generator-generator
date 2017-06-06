@@ -45,7 +45,7 @@ app = Flask(__name__)
 def test(supplier=None):
     print('Querying')
     start = timer()
-    sparql = SPARQLWrapper("http://sem-eurod01.tenforce.com:8890/sparql")
+    sparql = SPARQLWrapper("http://localhost:8890/sparql")
     sparql.setQuery("""
         prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -61,7 +61,7 @@ def test(supplier=None):
         prefix offer: <http://data.europa.eu/eurostat/id/offer/>
         prefix semtech: <http://mu.semte.ch/vocabularies/core/>
 
-        select ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training where{
+        select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training where{
             ?obs eurostat:product ?offer.
             ?offer a schema:Offer;
                 semtech:uuid ?UUID;
@@ -133,10 +133,12 @@ def test(supplier=None):
     training = []
     production = []
     for row in data:
-        if row["training"]:
+        if "ISBAUUID" in row:
             training.append(row)
-        else:
+        if not row["training"]:
             production.append(row)
+    print(len(data), len(training), len(production))
+
 
     GTINvoc = buildVoc(data)
 
@@ -366,7 +368,7 @@ def predict(training, production, targetField):
             "quantity": x['quantity'],
             "predictions":top
         }
-        if "classification" in result:
+        if "ISBAUUID" in x:
             result['classification'] = {
                 "isba_uuid": x["ISBAUUID"],
                 "isba_label": isba_label(x["ISBAUUID"])["label"],
