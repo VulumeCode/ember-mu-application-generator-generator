@@ -38,6 +38,7 @@ pd.set_option('display.max_colwidth', -1)
 
 app = Flask(__name__)
 
+databaseURL = "http://localhost:8890/sparql"
 
 @app.route('/test')
 @app.route('/test/')
@@ -45,7 +46,7 @@ app = Flask(__name__)
 def test(supplier=None):
     print('Querying')
     start = timer()
-    sparql = SPARQLWrapper("http://localhost:8890/sparql")
+    sparql = SPARQLWrapper(databaseURL)
     sparql.setQuery("""
         prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -388,7 +389,7 @@ def isba_label(key):
     if not isba_labels:
         print('Querying ISBA metadata')
         start = timer()
-        sparql = SPARQLWrapper("http://sem-eurod01.tenforce.com:8890/sparql")
+        sparql = SPARQLWrapper(databaseURL)
         sparql.setQuery("""
             prefix schema: <http://schema.org/>
             prefix offer: <http://data.europa.eu/eurostat/id/offer/>
