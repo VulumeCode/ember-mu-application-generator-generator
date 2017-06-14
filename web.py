@@ -59,7 +59,10 @@ def test():
         prefix offer: <http://data.europa.eu/eurostat/id/offer/>
         prefix semtech: <http://mu.semte.ch/vocabularies/core/>
 
-        select ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training where{
+        select ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training 
+        from <http://data.europa.eu/eurostat/temp>
+        from <http://data.europa.eu/eurostat/ECOICOP>
+        where{
             ?obs eurostat:product ?offer.
             ?offer a schema:Offer;
                 semtech:uuid ?UUID;
