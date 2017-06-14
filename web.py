@@ -23,129 +23,131 @@ from pandas import DataFrame
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer, HashingVectorizer
 from sklearn.decomposition import PCA, LatentDirichletAllocation
-
 from sklearn.externals import joblib
-
 import unicodedata
-
 from SPARQLWrapper import SPARQLWrapper, JSON
 
 
+databaseURL = "http://localhost:8890/sparql"
+# databaseURL = "http://sem-eurod01.tenforce.com:8890/sparql"
 
 
-plt.style.use(['dark_background'])
-pd.set_option('display.max_colwidth', -1)
+
 
 app = Flask(__name__)
 
 
 @app.route('/test')
-def test():
-    print('Querying')
-    start = timer()
-    sparql = SPARQLWrapper("http://sem-eurod01.tenforce.com:8890/sparql")
-    sparql.setQuery("""
-        prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-        prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        prefix qb: <http://purl.org/linked-data/cube#>
-        prefix eurostat: <http://data.europa.eu/eurostat/ns/>
-        prefix skos: <http://www.w3.org/2004/02/skos/core#>
-        prefix dct: <http://purl.org/dc/terms/>
-        prefix schema: <http://schema.org/>
-        prefix sdmx-subject: <http://purl.org/linked-data/sdmx/2009/subject#>
-        prefix sdmx-concept: <http://purl.org/linked-data/sdmx/2009/concept#>
-        prefix sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
-        prefix interval: <http://reference.data.gov.uk/def/intervals/>
-        prefix offer: <http://data.europa.eu/eurostat/id/offer/>
-        prefix semtech: <http://mu.semte.ch/vocabularies/core/>
+@app.route('/test/')
+@app.route('/test/<path:supplier>')
+def test(supplier=None):
+    try:
+        print('Querying')
+        start = timer()
+        sparql = SPARQLWrapper(databaseURL)
+        sparql.setQuery("""
+            prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+            prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            prefix qb: <http://purl.org/linked-data/cube#>
+            prefix eurostat: <http://data.europa.eu/eurostat/ns/>
+            prefix skos: <http://www.w3.org/2004/02/skos/core#>
+            prefix dct: <http://purl.org/dc/terms/>
+            prefix schema: <http://schema.org/>
+            prefix sdmx-subject: <http://purl.org/linked-data/sdmx/2009/subject#>
+            prefix sdmx-concept: <http://purl.org/linked-data/sdmx/2009/concept#>
+            prefix sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+            prefix interval: <http://reference.data.gov.uk/def/intervals/>
+            prefix offer: <http://data.europa.eu/eurostat/id/offer/>
+            prefix semtech: <http://mu.semte.ch/vocabularies/core/>
 
-        select ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training 
-        from <http://data.europa.eu/eurostat/temp>
-        from <http://data.europa.eu/eurostat/ECOICOP>
-        where{
-            ?obs eurostat:product ?offer.
-            ?offer a schema:Offer;
-                semtech:uuid ?UUID;
-                schema:description ?GTINdesc;
-                schema:gtin13 ?GTIN.
-            optional {
-                ?offer schema:includesObject [
-                    a schema:TypeAndQuantityNode;
-                    schema:amountOfThisGood ?quantity;
-                    schema:unitCode ?unit
-                ].}
-            optional {
-                ?offer schema:category ?ISBA.
-                ?ISBA semtech:uuid ?ISBAUUID.
-                }
-            ?obs eurostat:classification ?ESBA.
-            ?ESBA skos:prefLabel ?ESBAdesc.
-            ?obs qb:dataSet ?dataset.
-            ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/demo>.
-            ?obs eurostat:training ?training.
-        }
-    """)
-    sparql.setReturnFormat(JSON)
-    results = sparql.query().convert()
+            select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training 
+	    from <http://data.europa.eu/eurostat/temp>
+            from <http://data.europa.eu/eurostat/ECOICOP>
+	    where{
+                ?obs eurostat:product ?offer.
+                ?offer a schema:Offer;
+                    semtech:uuid ?UUID;
+                    schema:description ?GTINdesc;
+                    schema:gtin13 ?GTIN.
+                optional {
+                    ?offer schema:includesObject [
+                        a schema:TypeAndQuantityNode;
+                        schema:amountOfThisGood ?quantity;
+                        schema:unitCode ?unit
+                    ].}
+                optional {
+                    ?offer schema:category ?ISBA.
+                    ?ISBA semtech:uuid ?ISBAUUID.
+                    }
+                ?obs eurostat:classification ?ESBA.
+                ?ESBA skos:prefLabel ?ESBAdesc.
+                ?obs qb:dataSet ?dataset.
+                ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/demo>.
+                ?obs eurostat:training ?training.
+            }
+        """)
+        sparql.setReturnFormat(JSON)
+        results = sparql.query().convert()
 
-    data = []
-    for result in results["results"]["bindings"]:
-        record = {}
-        try: record["ISBAUUID"] = result["ISBAUUID"]["value"]
-        except: pass
-        try: record["ESBA"] = re.search("/([0-9]+)$",result["ESBA"]["value"])[1]
-        except: pass
-        try: record["ESBA-desc"] = result["ESBAdesc"]["value"]
-        except: pass
-        try: record["GTIN"] = result["GTIN"]["value"]
-        except: pass
-        try: record["GTIN-desc"] = result["GTINdesc"]["value"]
-        except: pass
-        try: record["unit"] = result["unit"]["value"]
-        except: record["unit"] = ""
-        try: record["quantity"] = result["quantity"]["value"]
-        except: record["quantity"] = ""
-        try: record["UUID"] = result["UUID"]["value"]
-        except: pass
-        try: record["training"] = result["training"]["value"] == "1"
-        except: pass
+        data = []
+        for result in results["results"]["bindings"]:
+            record = {}
+            try: record["ISBAUUID"] = result["ISBAUUID"]["value"]
+            except: pass
+            try: record["ESBA"] = re.search("/([0-9]+)$",result["ESBA"]["value"])[1]
+            except: pass
+            try: record["ESBA-desc"] = result["ESBAdesc"]["value"]
+            except: pass
+            try: record["GTIN"] = result["GTIN"]["value"]
+            except: pass
+            try: record["GTIN-desc"] = result["GTINdesc"]["value"]
+            except: pass
+            try: record["unit"] = result["unit"]["value"]
+            except: record["unit"] = ""
+            try: record["quantity"] = result["quantity"]["value"]
+            except: record["quantity"] = ""
+            try: record["UUID"] = result["UUID"]["value"]
+            except: pass
+            try: record["training"] = result["training"]["value"] == "1"
+            except: pass
 
-        if record not in data:
-            data.append(record)
-        else:
-            # print(record)
-            continue
+            if record not in data:
+                data.append(record)
+            else:
+                # print(record)
+                continue
 
-    for row in data:
-        desc = (" ").join(
-                         row["ESBA-desc"].lower().split()
-                         + row["GTIN-desc"].lower().split()
-                         + row["unit"].lower().split()
-                        )
-        row["prod-desc"] = unicodedata.normalize('NFKD',desc).encode('ASCII', 'ignore').decode('utf-8')
-    stop = timer()
-    print("Queried in", stop - start)
+        for row in data:
+            desc = (" ").join(
+                             row["ESBA-desc"].lower().split()
+                             + row["GTIN-desc"].lower().split()
+                             + row["unit"].lower().split()
+                            )
+            row["prod-desc"] = unicodedata.normalize('NFKD',desc).encode('ASCII', 'ignore').decode('utf-8')
+        stop = timer()
+        print("Queried in", stop - start)
 
-    # split = int(len(data)*0.90)
-    # shuffle(data)
-    # training = data[:split]
-    # production = data[split:]
 
-    training = []
-    production = []
-    for row in data:
-        if row["training"]:
-            training.append(row)
-        else:
-            production.append(row)
+        # Split the data in training and production data.
+        # Note that there can be overlap in the two sets.
+        # Production data that already has a label will be reclassified,
+        # but the given label will be in the response, too.
+        training = []
+        production = []
+        for row in data:
+            if "ISBAUUID" in row:
+                training.append(row)
+            if not row["training"]:
+                production.append(row)
 
-    GTINvoc = buildVoc(data)
 
-    buildFeatureVectors(data, GTINvoc)
+        buildFeatureVectors(data)
 
-    results = predict(training, production, "ISBAUUID")
+        results = predict(training, production, "ISBAUUID")
 
-    return jsonify(results)
+        return jsonify(results)
+    except Exception as e:
+        return jsonify(str(e)), 500
 
 
 @app.route('/mock')
@@ -157,20 +159,12 @@ def mock():
     training = data[:split]
     production = data[split:]
 
-    # No cheating!
-    # for x in production:
-    #     del x["ISBA-desc"]
-    #     del x["ISBA"]
-    #     del x["ECOICOP"]
-
-    GTINvoc = buildVoc(data)
-
-    buildFeatureVectors(data, GTINvoc)
+    buildFeatureVectors(data)
 
     results = predict(training, production, "ISBA-desc")
     return jsonify(results)
 
-@app.route('/file')
+@app.route('/csvfile')
 def file():
     trainfilename = request.args.get('train', '')
     prodfilename  = request.args.get('prod', '')
@@ -179,15 +173,10 @@ def file():
     production = readFromCSV(prodfilename)
     data = training + production
 
-    GTINvoc = buildVoc(data)
-
-    buildFeatureVectors(data, GTINvoc)
+    buildFeatureVectors(data)
 
     results = predict(training, production, "ISBA-desc")
     return jsonify(results)
-
-
-
 
 def readFromCSV(filename):
     """
@@ -199,28 +188,28 @@ def readFromCSV(filename):
     with open(filename, newline='', encoding="utf-8-sig") as csvfile:
         reader = csv.DictReader(csvfile, delimiter=',', quotechar='"')
         for row in reader:
-                record = {}
-                try: record["ECOICOP"] = row["ECOICOP"]
-                except: pass
-                try: record["ISBA"] = row["ISBA"]
-                except: pass
-                try: record["ISBA-desc"] = row["ISBA-description"]
-                except: pass
-                try: record["ESBA"] = row["ESBA"]
-                except: pass
-                try: record["ESBA-desc"] = row["ESBA-description"]
-                except: pass
-                try: record["GTIN"] = row["GTIN"]
-                except: pass
-                try: record["GTIN-desc"] = row["GTIN-description"] + " " + row["UNIT"]
-                except: pass
-                record["UUID"] = "MOCKUUID"
+            record = {}
+            try: record["ECOICOP"] = row["ECOICOP"]
+            except: pass
+            try: record["ISBA"] = row["ISBA"]
+            except: pass
+            try: record["ISBA-desc"] = row["ISBA-description"]
+            except: pass
+            try: record["ESBA"] = row["ESBA"]
+            except: pass
+            try: record["ESBA-desc"] = row["ESBA-description"]
+            except: pass
+            try: record["GTIN"] = row["GTIN"]
+            except: pass
+            try: record["GTIN-desc"] = row["GTIN-description"] + " " + row["UNIT"]
+            except: pass
+            record["UUID"] = "MOCKUUID"
 
-                if record not in data:
-                    data.append(record)
-                else:
-                    # print(record)
-                    continue
+            if record not in data:
+                data.append(record)
+            else:
+                # print(record)
+                continue
 
     for row in data:
         desc = (" ").join(
@@ -234,34 +223,36 @@ def readFromCSV(filename):
 
 
 
-def buildVoc(data):
+
+
+
+
+
+def buildFeatureVectors(data):
     """
-    Takes a list of records with a field 'prod-desc'
-    Returns a set of common substrings
+    Adds the feature vector 'feat-vec' to all records in data, using the other fields
     """
-    # The vocabulary is all words in the dataset, longer than 2 chars
-    GTINvoc = set()
-    for x in data:
-    #     GTINvoc |= set(x['prod-desc'].split())
-        GTINvoc |= set(re.split(r"[0-9 -./]+", x['prod-desc']))
 
-    # Add all possible len==3 ASCII strings
-    GTINvoc |= {x+y+z for x in string.ascii_lowercase for y in string.ascii_lowercase for z in string.ascii_lowercase}
+    def buildVoc(data):
+        """
+        Takes a list of records with a field 'prod-desc'
+        Returns a vocabulary of common substrings
+        The vocabulary is all words in the dataset, longer than 2 chars
+        Add all possible ASCII-char 3-grams
+        """
+        GTINvoc = set()
+        for x in data:
+            GTINvoc |= set(re.split(r"[0-9 -./]+", x['prod-desc']))
+        # 3-grams
+        GTINvoc = set(filter(lambda x: len(x) >= 2, GTINvoc))
+        GTINvoc |= {x+y+z for x in string.ascii_lowercase for y in string.ascii_lowercase for z in string.ascii_lowercase}
+        return GTINvoc
 
-    GTINvoc = list(filter(lambda x: len(x) >= 2, GTINvoc))
-
-    return GTINvoc
-
-
-
-
-def buildFeatureVectors(data, voc):
-    """
-    Adds the feature vector 'feat-vec' to all records in data, using the other fields and voc
-    """
-    # Retrieve all stems from the voc in the string
-    # Note: deduplicates words
     def stem(string, voc):
+        """
+        Retrieve all stems from the voc in the string
+        Note: deduplicates words
+        """
         result = []
         for stem in voc:
             if stem in string:
@@ -270,12 +261,18 @@ def buildFeatureVectors(data, voc):
 
 
     def pullGTINPrefix(gtin):
+        """
+        Decompose the GTIN string in its prefixes.
+        For instance 8419700110360 becomes 8, 84, 841, 8419, 84197 and so on.
+        """
         digitStrings = []
         for idx, digit in enumerate(gtin):
             if idx < 10:
-                digitStrings.append("p" + str(idx) + "_" + gtin[:idx+1])
+                digitStrings.append("GTIN" + str(idx) + "_" + gtin[:idx+1])
         return digitStrings
 
+
+    voc = buildVoc(data)
 
     # Build feature string
     for row in data:
@@ -299,7 +296,7 @@ def predict(training, production, targetField):
     """
     Train the model on 'training' to make predictions for 'production'.
     Input:  'feat-vec'
-    Output: 'ISBA'
+    Target: targetField
     """
     model = RandomForestClassifier(n_estimators=100) #, class_weight="balanced")
 
@@ -367,7 +364,7 @@ def predict(training, production, targetField):
             "quantity": x['quantity'],
             "predictions":top
         }
-        if "classification" in result:
+        if "ISBAUUID" in x:
             result['classification'] = {
                 "isba_uuid": x["ISBAUUID"],
                 "isba_label": isba_label(x["ISBAUUID"])["label"],
@@ -387,16 +384,16 @@ def isba_label(key):
     if not isba_labels:
         print('Querying ISBA metadata')
         start = timer()
-        sparql = SPARQLWrapper("http://sem-eurod01.tenforce.com:8890/sparql")
+        sparql = SPARQLWrapper(databaseURL)
         sparql.setQuery("""
             prefix schema: <http://schema.org/>
             prefix offer: <http://data.europa.eu/eurostat/id/offer/>
 
             select distinct ?ISBA ?ISBAUUID ?ISBAdesc where{
-             ?offer a schema:Offer;
-               schema:category ?ISBA.
-             ?ISBA skos:prefLabel ?ISBAdesc.
-             ?ISBA <http://mu.semte.ch/vocabularies/core/uuid> ?ISBAUUID.
+                ?offer a schema:Offer;
+                schema:category ?ISBA.
+                ?ISBA skos:prefLabel ?ISBAdesc.
+                ?ISBA <http://mu.semte.ch/vocabularies/core/uuid> ?ISBAUUID.
             }
         """)
         sparql.setReturnFormat(JSON)
