@@ -25,6 +25,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer, Ha
 from sklearn.decomposition import PCA, LatentDirichletAllocation
 from sklearn.externals import joblib
 import unicodedata
+import sys, traceback
 from SPARQLWrapper import SPARQLWrapper, JSON
 
 
@@ -33,11 +34,6 @@ databaseURL = "http://localhost:8890/sparql"
 
 
 app = Flask(__name__)
-
-@app.errorhandler(Exception)
-def handle_invalid_usage(error):
-    print(error)
-    return error, 500
     
 @app.route('/test')
 @app.route('/test/')
@@ -142,15 +138,15 @@ def test(supplier=None):
             if not row["training"]:
                 production.append(row)
 
-
         buildFeatureVectors(data)
 
         results = predict(training, production, "ISBAUUID")
 
         return jsonify(results)
     except Exception as e:
-        return jsonify(str(e)), 500
-
+        traceback.print_exc(file=sys.stdout)
+        return "{ error: " + str(e) + "}", 500
+        
 
 @app.route('/mock')
 def mock():
