@@ -32,11 +32,13 @@ databaseURL = "http://localhost:8890/sparql"
 # databaseURL = "http://sem-eurod01.tenforce.com:8890/sparql"
 
 
-
-
 app = Flask(__name__)
 
-
+@app.errorhandler(Exception)
+def handle_invalid_usage(error):
+    print(error)
+    return error, 500
+    
 @app.route('/test')
 @app.route('/test/')
 @app.route('/test/<path:supplier>')
