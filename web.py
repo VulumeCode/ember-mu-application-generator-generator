@@ -25,7 +25,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer, Ha
 from sklearn.decomposition import PCA, LatentDirichletAllocation
 from sklearn.externals import joblib
 import unicodedata
+import sys, traceback
 from SPARQLWrapper import SPARQLWrapper, JSON
+
 
 databaseURL = os.environ.get('MU_SPARQL_ENDPOINT')
 
@@ -137,15 +139,15 @@ def test(supplier=None):
             if not row["training"]:
                 production.append(row)
 
-
         buildFeatureVectors(data)
 
         results = predict(training, production, "ISBAUUID")
 
         return jsonify(results)
     except Exception as e:
-        return jsonify(str(e)), 500
-
+        traceback.print_exc(file=sys.stdout)
+        return "{ error: " + str(e) + "}", 500
+        
 
 @app.route('/mock')
 def mock():
