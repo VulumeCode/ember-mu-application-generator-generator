@@ -1,4 +1,4 @@
-from flask import Flask
+# from flask import Flask
 from flask.json import jsonify
 from flask import request
 
@@ -27,12 +27,7 @@ from sklearn.externals import joblib
 import unicodedata
 from SPARQLWrapper import SPARQLWrapper, JSON
 
-
-databaseURL = "http://localhost:8890/sparql"
-# databaseURL = "http://sem-eurod01.tenforce.com:8890/sparql"
-
-
-app = Flask(__name__)
+databaseURL = os.environ.get('MU_SPARQL_ENDPOINT')
 
 @app.errorhandler(Exception)
 def handle_invalid_usage(error):
@@ -409,6 +404,3 @@ def isba_label(key):
         stop = timer()
         print("Queried ISBA metadata in", stop - start)
     return isba_labels[key]
-
-if __name__ == "__main__":
-    app.run()
