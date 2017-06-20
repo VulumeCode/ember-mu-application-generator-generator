@@ -29,13 +29,13 @@ import sys, traceback
 from SPARQLWrapper import SPARQLWrapper, JSON
 
 
-databaseURL = os.environ.get('MU_SPARQL_ENDPOINT')
+databaseURL = os.environ.get('MU_SPARQL_ENDPOINT', default="http://sem-eurod01.tenforce.com:8890/sparql")
 
 @app.errorhandler(Exception)
 def handle_invalid_usage(error):
     print(error)
     return error, 500
-    
+
 @app.route('/test')
 @app.route('/test/')
 @app.route('/test/<path:supplier>')
@@ -59,7 +59,7 @@ def test(supplier=None):
             prefix offer: <http://data.europa.eu/eurostat/id/offer/>
             prefix semtech: <http://mu.semte.ch/vocabularies/core/>
 
-            select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training 
+            select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
 	    from <http://data.europa.eu/eurostat/temp>
             from <http://data.europa.eu/eurostat/ECOICOP>
 	    where{
@@ -146,36 +146,44 @@ def test(supplier=None):
         return jsonify(results)
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
-        return "{ error: " + str(e) + "}", 500
-        
+        return jsonify({"error": repr(e)}), 500
+
 
 @app.route('/mock')
 def mock():
-    data = readFromCSV('scannerdata/clean0329_ah.csv')
+    try:
+        data = readFromCSV('scannerdata/clean0329_ah.csv')
 
-    split = int(len(data)*0.90)
-    shuffle(data)
-    training = data[:split]
-    production = data[split:]
+        split = int(len(data)*0.90)
+        shuffle(data)
+        training = data[:split]
+        production = data[split:]
 
-    buildFeatureVectors(data)
+        buildFeatureVectors(data)
 
-    results = predict(training, production, "ISBA-desc")
-    return jsonify(results)
+        results = predict(training, production, "ISBA-desc")
+        return jsonify(results)
+    except Exception as e:
+        traceback.print_exc(file=sys.stdout)
+        return jsonify({"error": repr(e)}), 500
 
 @app.route('/csvfile')
 def file():
-    trainfilename = request.args.get('train', '')
-    prodfilename  = request.args.get('prod', '')
+    try:
+        trainfilename = request.args.get('train', '')
+        prodfilename  = request.args.get('prod', '')
 
-    training = readFromCSV(trainfilename)
-    production = readFromCSV(prodfilename)
-    data = training + production
+        training = readFromCSV(trainfilename)
+        production = readFromCSV(prodfilename)
+        data = training + production
 
-    buildFeatureVectors(data)
+        buildFeatureVectors(data)
 
-    results = predict(training, production, "ISBA-desc")
-    return jsonify(results)
+        results = predict(training, production, "ISBA-desc")
+        return jsonify(results)
+    except Exception as e:
+        traceback.print_exc(file=sys.stdout)
+        return jsonify({"error": repr(e)}), 500
 
 def readFromCSV(filename):
     """
