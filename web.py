@@ -38,10 +38,13 @@ def handle_invalid_usage(error):
 
 @app.route('/test')
 @app.route('/test/')
-@app.route('/test/<path:supplier>')
-def test(supplier=None):
+@app.route('/test/<path:glob>')
+def test(glob=None):
+    week = request.args.get('week', "2017-05-22")
+    publisher  = request.args.get('publisher', 'demo')
+
     try:
-        print('Querying')
+        print("Querying publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s> from week %(issued)s" % {'publisher': publisher, 'issued': week})
         start = timer()
         sparql = SPARQLWrapper(databaseURL)
         sparql.setQuery("""
@@ -81,10 +84,11 @@ def test(supplier=None):
                 ?obs eurostat:classification ?ESBA.
                 ?ESBA skos:prefLabel ?ESBAdesc.
                 ?obs qb:dataSet ?dataset.
-                ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/demo>.
+                ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s>.
+                ?dataset dct:issued "%(issued)s"^^xsd:dateTime.
                 ?obs eurostat:training ?training.
             }
-        """)
+        """ % {'publisher': publisher, 'issued': week})
         sparql.setReturnFormat(JSON)
         results = sparql.query().convert()
 
@@ -141,7 +145,7 @@ def test(supplier=None):
 
         buildFeatureVectors(data)
 
-        results = predict(training, production, "ISBAUUID")
+        results = predict(training, production)
 
         return jsonify(results)
     except Exception as e:
@@ -161,7 +165,7 @@ def mock():
 
         buildFeatureVectors(data)
 
-        results = predict(training, production, "ISBA-desc")
+        results = predict(training, production)
         return jsonify(results)
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
@@ -179,7 +183,7 @@ def file():
 
         buildFeatureVectors(data)
 
-        results = predict(training, production, "ISBA-desc")
+        results = predict(training, production)
         return jsonify(results)
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
@@ -231,10 +235,6 @@ def readFromCSV(filename):
 
 
 
-
-
-
-
 def buildFeatureVectors(data):
     """
     Adds the feature vector 'feat-vec' to all records in data, using the other fields
@@ -266,7 +266,6 @@ def buildFeatureVectors(data):
                 result.append(stem)
         return result
 
-
     def pullGTINPrefix(gtin):
         """
         Decompose the GTIN string in its prefixes.
@@ -277,7 +276,6 @@ def buildFeatureVectors(data):
             if idx < 10:
                 digitStrings.append("GTIN" + str(idx) + "_" + gtin[:idx+1])
         return digitStrings
-
 
     voc = buildVoc(data)
 
@@ -299,18 +297,26 @@ def buildFeatureVectors(data):
     for x in data:
         x['feat-vec'] = vectorizer.transform([x['feat-str']]).toarray()[0]
 
-def predict(training, production, targetField):
+    return
+
+
+
+def predict(training, production):
     """
     Train the model on 'training' to make predictions for 'production'.
     Input:  'feat-vec'
-    Target: targetField
     """
-    model = RandomForestClassifier(n_estimators=100) #, class_weight="balanced")
 
+    # Select the model.
+    # Random forests is used in the prototype for interactive classification.
+    # Logistic Regression is suggested for purely automatic classification.
+    # Naive Bayes is a baseline reference.
+    model = RandomForestClassifier(n_estimators=100)
     # model = LR(multi_class="multinomial", solver="lbfgs")
-    # model = LR()
-    # model = LR(penalty="l1")
-    # model = MultinomialNB(alpha=1)
+    # model = MultinomialNB()
+
+
+    targetField = "ISBAUUID"
 
     nrProductionPoints = len(production)
     nrTrainingPoints = len(training)
