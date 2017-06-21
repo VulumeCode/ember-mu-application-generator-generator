@@ -41,7 +41,7 @@ def handle_invalid_usage(error):
 @app.route('/test/<path:glob>')
 def test(glob=None):
     week = request.args.get('week', "2017-05-22")
-    publisher  = request.args.get('publisher', 'demo')
+    publisher = request.args.get('publisher', 'demo')
 
     try:
         print("Querying publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s> from week %(issued)s" % {'publisher': publisher, 'issued': week})
@@ -63,9 +63,9 @@ def test(glob=None):
             prefix semtech: <http://mu.semte.ch/vocabularies/core/>
 
             select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
-	    from <http://data.europa.eu/eurostat/temp>
+	        from <http://data.europa.eu/eurostat/temp>
             from <http://data.europa.eu/eurostat/ECOICOP>
-	    where{
+	        where{
                 ?obs eurostat:product ?offer.
                 ?offer a schema:Offer;
                     semtech:uuid ?UUID;
@@ -305,6 +305,7 @@ def predict(training, production):
     """
     Train the model on 'training' to make predictions for 'production'.
     Input:  'feat-vec'
+    Output: 'ISBAUUID'
     """
 
     # Select the model.
