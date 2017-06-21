@@ -3,6 +3,7 @@ from flask.json import jsonify
 from flask import request
 
 from timeit import default_timer as timer
+from datetime import datetime, date, timedelta
 
 
 
@@ -47,21 +48,7 @@ def test(glob=None):
         print("Querying publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s> from week %(issued)s" % {'publisher': publisher, 'issued': week})
         start = timer()
         sparql = SPARQLWrapper(databaseURL)
-        sparql.setQuery("""
-            prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            prefix qb: <http://purl.org/linked-data/cube#>
-            prefix eurostat: <http://data.europa.eu/eurostat/ns/>
-            prefix skos: <http://www.w3.org/2004/02/skos/core#>
-            prefix dct: <http://purl.org/dc/terms/>
-            prefix schema: <http://schema.org/>
-            prefix sdmx-subject: <http://purl.org/linked-data/sdmx/2009/subject#>
-            prefix sdmx-concept: <http://purl.org/linked-data/sdmx/2009/concept#>
-            prefix sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
-            prefix interval: <http://reference.data.gov.uk/def/intervals/>
-            prefix offer: <http://data.europa.eu/eurostat/id/offer/>
-            prefix semtech: <http://mu.semte.ch/vocabularies/core/>
-
+        sparql.setQuery(sparqlPrefixes + """
             select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
 	        from <http://data.europa.eu/eurostat/temp>
             from <http://data.europa.eu/eurostat/ECOICOP>
@@ -151,6 +138,189 @@ def test(glob=None):
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
         return jsonify({"error": repr(e)}), 500
+
+
+
+
+
+@app.route('/classify')
+@app.route('/classify/')
+@app.route('/classify/<path:glob>')
+def classify(glob=None):
+    publisher = request.args.get('publisher', 'demo')
+    week = request.args.get('week', "2017-05-22")
+    fromdate = str(datetime.strptime('2016-06-21', '%Y-%m-%d').date() - timedelta(days=365))
+
+    try:
+        print("Querying publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s> from week %(issued)s" % {'publisher': publisher, 'issued': week})
+        # training data
+        start = timer()
+        sparql = SPARQLWrapper(databaseURL)
+        sparql.setQuery(sparqlPrefixes + """
+            select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
+	        from <http://data.europa.eu/eurostat/temp>
+            from <http://data.europa.eu/eurostat/ECOICOP>
+	        where{
+                ?obs eurostat:product ?offer.
+                ?offer a schema:Offer;
+                    semtech:uuid ?UUID;
+                    schema:description ?GTINdesc;
+                    schema:gtin13 ?GTIN.
+                optional {
+                    ?offer schema:includesObject [
+                        a schema:TypeAndQuantityNode;
+                        schema:amountOfThisGood ?quantity;
+                        schema:unitCode ?unit
+                    ].}
+
+                ?offer schema:category ?ISBA.
+                ?ISBA semtech:uuid ?ISBAUUID.
+
+                ?obs eurostat:classification ?ESBA.
+                ?ESBA skos:prefLabel ?ESBAdesc.
+                ?obs qb:dataSet ?dataset.
+                ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s>.
+                ?dataset dct:issued ?date.
+                FILTER ( ?date >= "%(fromdate)s"^^xsd:dateTime).
+                ?obs eurostat:training ?training.
+            }
+        """ % {'publisher': publisher, 'fromdate': fromdate})
+        sparql.setReturnFormat(JSON)
+        results = sparql.query().convert()
+
+        training = []
+        for result in results["results"]["bindings"]:
+            record = {}
+            try: record["ISBAUUID"] = result["ISBAUUID"]["value"]
+            except: pass
+            try: record["ESBA"] = re.search("/([0-9]+)$",result["ESBA"]["value"])[1]
+            except: pass
+            try: record["ESBA-desc"] = result["ESBAdesc"]["value"]
+            except: pass
+            try: record["GTIN"] = result["GTIN"]["value"]
+            except: pass
+            try: record["GTIN-desc"] = result["GTINdesc"]["value"]
+            except: pass
+            try: record["unit"] = result["unit"]["value"]
+            except: record["unit"] = ""
+            try: record["quantity"] = result["quantity"]["value"]
+            except: record["quantity"] = ""
+            try: record["UUID"] = result["UUID"]["value"]
+            except: pass
+            try: record["training"] = result["training"]["value"] == "1"
+            except: pass
+
+            if record not in training:
+                training.append(record)
+
+
+        # production data
+        start = timer()
+        sparql = SPARQLWrapper(databaseURL)
+        sparql.setQuery(sparqlPrefixes + """
+            select distinct ?GTINdesc ?GTIN ?ESBA ?ESBAdesc ?UUID ?quantity ?unit
+	        from <http://data.europa.eu/eurostat/temp>
+            from <http://data.europa.eu/eurostat/ECOICOP>
+	        where{
+                ?obs eurostat:product ?offer.
+                ?offer a schema:Offer;
+                    semtech:uuid ?UUID;
+                    schema:description ?GTINdesc;
+                    schema:gtin13 ?GTIN.
+                optional {
+                    ?offer schema:includesObject [
+                        a schema:TypeAndQuantityNode;
+                        schema:amountOfThisGood ?quantity;
+                        schema:unitCode ?unit
+                    ].}
+
+                ?obs eurostat:classification ?ESBA.
+                ?ESBA skos:prefLabel ?ESBAdesc.
+                ?obs qb:dataSet ?dataset.
+                ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s>.
+                ?dataset dct:issued "%(issued)s"^^xsd:dateTime.
+                ?obs eurostat:training "false"^^<http://www.w3.org/2001/XMLSchema#boolean>.
+            }
+        """ % {'publisher': publisher, 'issued': week})
+        sparql.setReturnFormat(JSON)
+        results = sparql.query().convert()
+
+        production = []
+        for result in results["results"]["bindings"]:
+            record = {}
+            try: record["ESBA"] = re.search("/([0-9]+)$",result["ESBA"]["value"])[1]
+            except: pass
+            try: record["ESBA-desc"] = result["ESBAdesc"]["value"]
+            except: pass
+            try: record["GTIN"] = result["GTIN"]["value"]
+            except: pass
+            try: record["GTIN-desc"] = result["GTINdesc"]["value"]
+            except: pass
+            try: record["unit"] = result["unit"]["value"]
+            except: record["unit"] = ""
+            try: record["quantity"] = result["quantity"]["value"]
+            except: record["quantity"] = ""
+            try: record["UUID"] = result["UUID"]["value"]
+            except: pass
+
+            if record not in training:
+                production.append(record)
+
+
+
+
+
+        pprint(training)
+
+
+
+
+        # Note that there can be overlap in the two sets.
+        # Production data that already has a label will be reclassified,
+        # but the given label will be in the response, too.
+        data = training + production
+
+        for row in data:
+            desc = (" ").join(
+                             row["ESBA-desc"].lower().split()
+                             + row["GTIN-desc"].lower().split()
+                             + row["unit"].lower().split()
+                            )
+            row["prod-desc"] = unicodedata.normalize('NFKD',desc).encode('ASCII', 'ignore').decode('utf-8')
+        stop = timer()
+        print("Queried in", stop - start)
+
+        buildFeatureVectors(data)
+
+        results = predict(training, production)
+
+        return jsonify(results)
+    except Exception as e:
+        traceback.print_exc(file=sys.stdout)
+        return jsonify({"error": repr(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -316,7 +486,7 @@ def isba_label(key):
     Fetch and memoize isba labels.
     """
     global isba_labels
-    if not isba_labels:
+    if (not isba_labels) or (not key in isba_labels):
         print('Querying ISBA metadata')
         start = timer()
         sparql = SPARQLWrapper(databaseURL)
@@ -342,3 +512,20 @@ def isba_label(key):
         stop = timer()
         print("Queried ISBA metadata in", stop - start)
     return isba_labels[key]
+
+
+
+sparqlPrefixes = """
+    prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    prefix qb: <http://purl.org/linked-data/cube#>
+    prefix eurostat: <http://data.europa.eu/eurostat/ns/>
+    prefix skos: <http://www.w3.org/2004/02/skos/core#>
+    prefix dct: <http://purl.org/dc/terms/>
+    prefix schema: <http://schema.org/>
+    prefix sdmx-subject: <http://purl.org/linked-data/sdmx/2009/subject#>
+    prefix sdmx-concept: <http://purl.org/linked-data/sdmx/2009/concept#>
+    prefix sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+    prefix interval: <http://reference.data.gov.uk/def/intervals/>
+    prefix offer: <http://data.europa.eu/eurostat/id/offer/>
+    prefix semtech: <http://mu.semte.ch/vocabularies/core/>"""
