@@ -37,8 +37,8 @@ def handle_invalid_usage(error):
     print(error)
     return error, 500
 
+#@app.route('/test/')
 @app.route('/test')
-@app.route('/test/')
 @app.route('/test/<path:glob>')
 def test(glob=None):
     week = request.args.get('week', "2017-05-22")
@@ -47,24 +47,24 @@ def test(glob=None):
     try:
         print("Querying publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s> from week %(issued)s" % {'publisher': publisher, 'issued': week})
         start = timer()
-        sparql = SPARQLWrapper(databaseURL)
+        sparql = SPARQLWrapper(databaseURL + '?graph-realm-id=' + publisher)
         sparql.setQuery(sparqlPrefixes + """
-            select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
-	        from <http://data.europa.eu/eurostat/temp>
-            from <http://data.europa.eu/eurostat/ECOICOP>
-	        where{
+            SELECT DISTINCT ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
+	        FROM <http://data.europa.eu/eurostat/temp>
+            FROM <http://data.europa.eu/eurostat/ECOICOP>
+	        WHERE {
                 ?obs eurostat:product ?offer.
                 ?offer a schema:Offer;
                     semtech:uuid ?UUID;
                     schema:description ?GTINdesc;
                     schema:gtin13 ?GTIN.
-                optional {
+                OPTIONAL {
                     ?offer schema:includesObject [
                         a schema:TypeAndQuantityNode;
                         schema:amountOfThisGood ?quantity;
                         schema:unitCode ?unit
                     ].}
-                optional {
+                OPTIONAL {
                     ?offer schema:category ?ISBA.
                     ?ISBA semtech:uuid ?ISBAUUID.
                     }
@@ -76,6 +76,7 @@ def test(glob=None):
                 ?obs eurostat:training ?training.
             }
         """ % {'publisher': publisher, 'issued': week})
+        sparql.method = 'POST'
         sparql.setReturnFormat(JSON)
         results = sparql.query().convert()
 
@@ -142,9 +143,8 @@ def test(glob=None):
 
 
 
-
+#@app.route('/classify/')
 @app.route('/classify')
-@app.route('/classify/')
 @app.route('/classify/<path:glob>')
 def classify(glob=None):
     publisher = request.args.get('publisher', 'demo')
@@ -157,16 +157,16 @@ def classify(glob=None):
         start = timer()
         sparql = SPARQLWrapper(databaseURL)
         sparql.setQuery(sparqlPrefixes + """
-            select distinct ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
-	        from <http://data.europa.eu/eurostat/temp>
-            from <http://data.europa.eu/eurostat/ECOICOP>
-	        where{
+            SELECT DISTINCT ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
+	        FROM <http://data.europa.eu/eurostat/temp>
+            FROM <http://data.europa.eu/eurostat/ECOICOP>
+	        WHERE {
                 ?obs eurostat:product ?offer.
                 ?offer a schema:Offer;
                     semtech:uuid ?UUID;
                     schema:description ?GTINdesc;
                     schema:gtin13 ?GTIN.
-                optional {
+                OPTIONAL {
                     ?offer schema:includesObject [
                         a schema:TypeAndQuantityNode;
                         schema:amountOfThisGood ?quantity;
@@ -185,6 +185,7 @@ def classify(glob=None):
                 ?obs eurostat:training ?training.
             }
         """ % {'publisher': publisher, 'fromdate': fromdate})
+        sparql.method = 'POST'
         sparql.setReturnFormat(JSON)
         results = sparql.query().convert()
 
@@ -216,18 +217,18 @@ def classify(glob=None):
 
         # production data
         start = timer()
-        sparql = SPARQLWrapper(databaseURL)
+        sparql = SPARQLWrapper(databaseURL + '?graph-realm-id=' + publisher)
         sparql.setQuery(sparqlPrefixes + """
-            select distinct ?GTINdesc ?GTIN ?ESBA ?ESBAdesc ?UUID ?quantity ?unit
-	        from <http://data.europa.eu/eurostat/temp>
-            from <http://data.europa.eu/eurostat/ECOICOP>
-	        where{
+            SELECT DISTINCT ?GTINdesc ?GTIN ?ESBA ?ESBAdesc ?UUID ?quantity ?unit
+	        FROM <http://data.europa.eu/eurostat/temp>
+            FROM <http://data.europa.eu/eurostat/ECOICOP>
+	        WHERE {
                 ?obs eurostat:product ?offer.
                 ?offer a schema:Offer;
                     semtech:uuid ?UUID;
                     schema:description ?GTINdesc;
                     schema:gtin13 ?GTIN.
-                optional {
+                OPTIONAL {
                     ?offer schema:includesObject [
                         a schema:TypeAndQuantityNode;
                         schema:amountOfThisGood ?quantity;
@@ -242,6 +243,7 @@ def classify(glob=None):
                 ?obs eurostat:training "false"^^<http://www.w3.org/2001/XMLSchema#boolean>.
             }
         """ % {'publisher': publisher, 'issued': week})
+        sparql.method = 'POST'
         sparql.setReturnFormat(JSON)
         results = sparql.query().convert()
 
@@ -491,10 +493,12 @@ def isba_label(key):
         start = timer()
         sparql = SPARQLWrapper(databaseURL)
         sparql.setQuery("""
-            prefix schema: <http://schema.org/>
-            prefix offer: <http://data.europa.eu/eurostat/id/offer/>
+            PREFIX schema: <http://schema.org/>
+            PREFIX offer: <http://data.europa.eu/eurostat/id/offer/>
 
-            select distinct ?ISBA ?ISBAUUID ?ISBAdesc where{
+            SELECT DISTINCT ?ISBA ?ISBAUUID ?ISBAdesc 
+	        FROM <http://data.europa.eu/eurostat/temp>
+            WHERE {
                 ?offer a schema:Offer;
                 schema:category ?ISBA.
                 ?ISBA skos:prefLabel ?ISBAdesc.
@@ -516,16 +520,16 @@ def isba_label(key):
 
 
 sparqlPrefixes = """
-    prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-    prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    prefix qb: <http://purl.org/linked-data/cube#>
-    prefix eurostat: <http://data.europa.eu/eurostat/ns/>
-    prefix skos: <http://www.w3.org/2004/02/skos/core#>
-    prefix dct: <http://purl.org/dc/terms/>
-    prefix schema: <http://schema.org/>
-    prefix sdmx-subject: <http://purl.org/linked-data/sdmx/2009/subject#>
-    prefix sdmx-concept: <http://purl.org/linked-data/sdmx/2009/concept#>
-    prefix sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
-    prefix interval: <http://reference.data.gov.uk/def/intervals/>
-    prefix offer: <http://data.europa.eu/eurostat/id/offer/>
-    prefix semtech: <http://mu.semte.ch/vocabularies/core/>"""
+    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX qb: <http://purl.org/linked-data/cube#>
+    PREFIX eurostat: <http://data.europa.eu/eurostat/ns/>
+    PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+    PREFIX dct: <http://purl.org/dc/terms/>
+    PREFIX schema: <http://schema.org/>
+    PREFIX sdmx-subject: <http://purl.org/linked-data/sdmx/2009/subject#>
+    PREFIX sdmx-concept: <http://purl.org/linked-data/sdmx/2009/concept#>
+    PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+    PREFIX interval: <http://reference.data.gov.uk/def/intervals/>
+    PREFIX offer: <http://data.europa.eu/eurostat/id/offer/>
+    PREFIX semtech: <http://mu.semte.ch/vocabularies/core/>"""
