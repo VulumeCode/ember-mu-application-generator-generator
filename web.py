@@ -37,12 +37,13 @@ def handle_invalid_usage(error):
     print(error)
     return error, 500
 
-#@app.route('/test/')
 @app.route('/test')
+@app.route('/test/')
 @app.route('/test/<path:glob>')
 def test(glob=None):
     week = request.args.get('week', "2017-05-22")
     publisher = request.args.get('publisher', 'demo')
+    model = request.args.get('model', "RandomForest")
 
     try:
         print("Querying publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s> from week %(issued)s" % {'publisher': publisher, 'issued': week})
@@ -133,7 +134,7 @@ def test(glob=None):
 
         buildFeatureVectors(data)
 
-        results = predict(training, production)
+        results = predict(training, production, model)
 
         return jsonify(results)
     except Exception as e:
@@ -143,12 +144,13 @@ def test(glob=None):
 
 
 
-#@app.route('/classify/')
 @app.route('/classify')
+@app.route('/classify/')
 @app.route('/classify/<path:glob>')
 def classify(glob=None):
     publisher = request.args.get('publisher', 'demo')
     week = request.args.get('week', "2017-05-22")
+    model = request.args.get('model', "RandomForest")
     fromdate = str(datetime.strptime('2016-06-21', '%Y-%m-%d').date() - timedelta(days=365))
 
     try:
@@ -294,7 +296,7 @@ def classify(glob=None):
 
         buildFeatureVectors(data)
 
-        results = predict(training, production)
+        results = predict(training, production, model)
 
         return jsonify(results)
     except Exception as e:
@@ -394,21 +396,28 @@ def buildFeatureVectors(data):
 
 
 
-def predict(training, production):
+def predict(training, production, modelName="RandomForest"):
     """
     Train the model on 'training' to make predictions for 'production'.
     Input:  'feat-vec'
     Output: 'ISBAUUID'
     """
 
+
     # Select the model.
     # Random forests is used in the prototype for interactive classification.
     # Logistic Regression is suggested for purely automatic classification.
     # Naive Bayes is a baseline reference.
-    model = RandomForestClassifier(n_estimators=100)
-    # model = LR(multi_class="multinomial", solver="lbfgs")
-    # model = MultinomialNB()
+    models = {
+        "RandomForest": RandomForestClassifier(n_estimators=100)
+        ,
+        "LinearRegression": LR(multi_class="multinomial", solver="lbfgs")
+        ,
+        "NaiveBayes": MultinomialNB()
+        }
+    model = models[modelName]
 
+    print("Model:", modelName)
 
     targetField = "ISBAUUID"
 
@@ -496,7 +505,7 @@ def isba_label(key):
             PREFIX schema: <http://schema.org/>
             PREFIX offer: <http://data.europa.eu/eurostat/id/offer/>
 
-            SELECT DISTINCT ?ISBA ?ISBAUUID ?ISBAdesc 
+            SELECT DISTINCT ?ISBA ?ISBAUUID ?ISBAdesc
 	        FROM <http://data.europa.eu/eurostat/temp>
             WHERE {
                 ?offer a schema:Offer;
