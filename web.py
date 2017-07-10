@@ -151,7 +151,7 @@ def classify(glob=None):
     publisher = request.args.get('publisher', 'demo')
     week = request.args.get('week', "2017-05-22")
     model = request.args.get('model', "RandomForest")
-    fromdate = str(datetime.strptime('2016-06-21', '%Y-%m-%d').date() - timedelta(days=365))
+    fromdate = str(datetime.strptime(week, '%Y-%m-%d').date() - timedelta(days=365))
 
     try:
         print("Querying publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s> from week %(issued)s" % {'publisher': publisher, 'issued': week})
