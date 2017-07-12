@@ -38,7 +38,6 @@ def handle_invalid_usage(error):
     return error, 500
 
 @app.route('/test')
-@app.route('/test/')
 @app.route('/test/<path:glob>')
 def test(glob=None):
     week = request.args.get('week', "2017-05-22")
@@ -145,7 +144,6 @@ def test(glob=None):
 
 
 @app.route('/classify')
-@app.route('/classify/')
 @app.route('/classify/<path:glob>')
 def classify(glob=None):
     publisher = request.args.get('publisher', 'demo')
