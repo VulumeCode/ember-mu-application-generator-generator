@@ -443,6 +443,9 @@ def predict(training, production, modelName="RandomForest"):
     stop = timer()
     print("Trained in", stop - start)
 
+
+    isba_labels = fetch_isba_labels()
+
     productionSample = np.zeros((nrProductionPoints,nrFeatures))
 
     for idx_x, x in enumerate(production):
@@ -450,8 +453,8 @@ def predict(training, production, modelName="RandomForest"):
 
     def guessesTop(probs,classes, topN = 100):
         guesses =   [{'isba_uuid': isba,
-                      'isba_label':isba_label(isba)["label"],
-                      'notation':isba_label(isba)["notation"],
+                      'isba_label':isba_labels[isba]["label"],
+                      'notation':isba_labels[isba]["notation"],
                       'value':prob}
                     for isba,prob in zip(classes, probs)]
         guesses = (sorted(guesses, key=lambda r:r['value']))[-topN:]
@@ -463,7 +466,6 @@ def predict(training, production, modelName="RandomForest"):
     probss = model.predict_proba(productionSample)
     stop = timer()
     print("Predicted in", stop - start)
-
 
     results = []
     for x, probs in zip(production, probss):
@@ -477,7 +479,7 @@ def predict(training, production, modelName="RandomForest"):
             "unit":     x['unit'],
             "quantity": x['quantity'],
             "predictions": top,
-            # turnover is set to a sample value 
+            # turnover is set to a sample value
             # as it is missing at present  from the original datasets
             # that are uploaded
             "turnover" : int(top[0]['value'] * 100) if (top != None and len(top) > 1) else random.randint(0, 100)
@@ -485,50 +487,47 @@ def predict(training, production, modelName="RandomForest"):
         if "ISBAUUID" in x:
             result['classification'] = {
                 "isba_uuid": x["ISBAUUID"],
-                "isba_label": isba_label(x["ISBAUUID"])["label"],
-                "notation": isba_label(x["ISBAUUID"])["notation"]
+                "isba_label": isba_labels[x["ISBAUUID"]]["label"],
+                "notation": isba_labels[x["ISBAUUID"]]["notation"]
             }
         results.append(result)
 
     return results
 
 
-isba_labels = {}
-def isba_label(key):
+def fetch_isba_labels():
     """
-    Fetch and memoize isba labels.
+    Fetch and return isba labels as a dict.
+    Dict { ISBA UUID : {"label" : ISBA description, "notation" : ISBA code}}
     """
-    global isba_labels
-    if (not isba_labels) or (not key in isba_labels):
-        print('Querying ISBA metadata')
-        start = timer()
-        sparql = SPARQLWrapper(databaseURL)
-        sparql.setQuery("""
-            PREFIX schema: <http://schema.org/>
-            PREFIX offer: <http://data.europa.eu/eurostat/id/offer/>
+    isba_labels = {}
+    print('Querying ISBA metadata')
+    start = timer()
+    sparql = SPARQLWrapper(databaseURL)
+    sparql.setQuery("""
+        PREFIX schema: <http://schema.org/>
+        PREFIX offer: <http://data.europa.eu/eurostat/id/offer/>
 
-            SELECT DISTINCT ?ISBA ?ISBAUUID ?ISBAdesc
-	        FROM <http://data.europa.eu/eurostat/temp>
-            WHERE {
-                ?offer a schema:Offer;
-                schema:category ?ISBA.
-                ?ISBA skos:prefLabel ?ISBAdesc.
-                ?ISBA <http://mu.semte.ch/vocabularies/core/uuid> ?ISBAUUID.
-            }
-        """)
-        sparql.setReturnFormat(JSON)
-        results = sparql.query().convert()
-        isba_labels =   {result["ISBAUUID"]["value"]:
-                            {"label":
-                                result["ISBAdesc"]["value"]
-                            , "notation":
-                                re.search("/([0-9]+)$",result["ISBA"]["value"])[1]}
-                        for result in results["results"]["bindings"]}
-        stop = timer()
-        print("Queried ISBA metadata in", stop - start)
-    return isba_labels[key]
-
-
+        SELECT DISTINCT ?ISBA ?ISBAUUID ?ISBAdesc
+        FROM <http://data.europa.eu/eurostat/temp>
+        WHERE {
+            ?offer a schema:Offer;
+            schema:category ?ISBA.
+            ?ISBA skos:prefLabel ?ISBAdesc.
+            ?ISBA <http://mu.semte.ch/vocabularies/core/uuid> ?ISBAUUID.
+        }
+    """)
+    sparql.setReturnFormat(JSON)
+    results = sparql.query().convert()
+    isba_labels =   {result["ISBAUUID"]["value"]:
+                        {"label":
+                            result["ISBAdesc"]["value"]
+                        , "notation":
+                            re.search("/([0-9]+)$",result["ISBA"]["value"])[1]}
+                    for result in results["results"]["bindings"]}
+    stop = timer()
+    print("Queried ISBA metadata in", stop - start)
+    return isba_labels
 
 sparqlPrefixes = """
     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
