@@ -19,7 +19,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB, GaussianNB
 from sklearn.linear_model import LogisticRegression as LR
 from sklearn.neighbors import KNeighborsClassifier
-from random import shuffle, random
+from random import shuffle, random, randint
 from pandas import DataFrame
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer, HashingVectorizer
@@ -476,7 +476,11 @@ def predict(training, production, modelName="RandomForest"):
             "ESBA-desc":x['ESBA-desc'],
             "unit":     x['unit'],
             "quantity": x['quantity'],
-            "predictions":top
+            "predictions": top,
+            # turnover is set to a sample value 
+            # as it is missing at present  from the original datasets
+            # that are uploaded
+            "turnover" : int(top['value'] * 100) if (top != None and len(top) > 1) else random.randint(0, 100)
         }
         if "ISBAUUID" in x:
             result['classification'] = {
