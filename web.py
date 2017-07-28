@@ -181,7 +181,7 @@ def classify(glob=None):
                 ?obs qb:dataSet ?dataset.
                 ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s>.
                 ?dataset dct:issued ?date.
-                FILTER ( ?date >= "%(fromdate)s"^^xsd:dateTime).
+                FILTER ( ?date >= "%(fromdate)s"^^xsd:dateTime)
                 ?obs eurostat:training ?training.
             }
         """ % {'publisher': publisher, 'fromdate': fromdate})
