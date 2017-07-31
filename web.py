@@ -219,7 +219,7 @@ def classify(glob=None):
         start = timer()
         sparql = SPARQLWrapper(databaseURL + '?graph-realm-id=' + publisher)
         sparql.setQuery(sparqlPrefixes + """
-            SELECT DISTINCT ?GTINdesc ?GTIN ?ESBA ?ESBAdesc ?UUID ?quantity ?unit
+            SELECT DISTINCT ?GTINdesc ?GTIN ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit
 	        FROM <http://data.europa.eu/eurostat/temp>
             FROM <http://data.europa.eu/eurostat/ECOICOP>
 	        WHERE {
@@ -234,7 +234,10 @@ def classify(glob=None):
                         schema:amountOfThisGood ?quantity;
                         schema:unitCode ?unit
                     ].}
-
+                OPTIONAL {
+                    ?offer schema:category ?ISBA.
+                    ?ISBA semtech:uuid ?ISBAUUID.
+                    }
                 ?obs eurostat:classification ?ESBA.
                 ?ESBA skos:prefLabel ?ESBAdesc.
                 ?obs qb:dataSet ?dataset.
@@ -250,6 +253,8 @@ def classify(glob=None):
         production = []
         for result in results["results"]["bindings"]:
             record = {}
+            try: record["ISBAUUID"] = result["ISBAUUID"]["value"]
+            except: pass
             try: record["ESBA"] = re.search("/([0-9]+)$",result["ESBA"]["value"])[1]
             except: pass
             try: record["ESBA-desc"] = result["ESBAdesc"]["value"]
@@ -267,13 +272,6 @@ def classify(glob=None):
 
             if record not in training:
                 production.append(record)
-
-
-
-
-
-        pprint(training)
-
 
 
 
