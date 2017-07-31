@@ -240,7 +240,7 @@ def classify(glob=None):
                 ?obs qb:dataSet ?dataset.
                 ?dataset dct:publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s>.
                 ?dataset dct:issued "%(issued)s"^^xsd:dateTime.
-                ?obs eurostat:training "false"^^<http://www.w3.org/2001/XMLSchema#boolean>.
+                ?obs eurostat:training 0.
             }
         """ % {'publisher': publisher, 'issued': week})
         sparql.method = 'POST'
