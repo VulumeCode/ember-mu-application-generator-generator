@@ -19,6 +19,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB, GaussianNB
 from sklearn.linear_model import LogisticRegression as LR
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import LinearSVC
 from random import shuffle, random, randint
 from pandas import DataFrame
 import pandas as pd
@@ -410,6 +411,8 @@ def predict(training, production, modelName="RandomForest"):
         "LinearRegression": LR(multi_class="multinomial", solver="lbfgs")
         ,
         "NaiveBayes": MultinomialNB()
+        ,
+        "SVM": SVM()
         }
     model = models[modelName]
 
@@ -541,3 +544,17 @@ sparqlPrefixes = """
     PREFIX interval: <http://reference.data.gov.uk/def/intervals/>
     PREFIX offer: <http://data.europa.eu/eurostat/id/offer/>
     PREFIX semtech: <http://mu.semte.ch/vocabularies/core/>"""
+
+
+
+class SVM(LinearSVC):
+    """
+    Wrapper to get predict_proba results from LinearSVC
+    """
+    def predict_proba(self,X):
+        ps = self.predict(X)
+        result = np.zeros((X.shape[0], len(self.classes_)))
+        for idxp, p in enumerate(ps):
+            idxc = np.argwhere(p == self.classes_)[0][0]
+            result[idxp][idxc] = 1
+        return result
