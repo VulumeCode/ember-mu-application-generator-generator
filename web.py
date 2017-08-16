@@ -271,7 +271,7 @@ def classify(glob=None):
             try: record["UUID"] = result["UUID"]["value"]
             except: pass
 
-            if record not in training:
+            if record not in production:
                 production.append(record)
 
 
