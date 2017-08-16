@@ -48,7 +48,7 @@ def test(glob=None):
     try:
         print("Querying publisher <http://data.europa.eu/eurostat/id/organization/%(publisher)s> from week %(issued)s" % {'publisher': publisher, 'issued': week})
         start = timer()
-        sparql = SPARQLWrapper(databaseURL + '?graph-realm-id=' + publisher)
+        sparql = SPARQLWrapper(databaseURL)
         sparql.setQuery(sparqlPrefixes + """
             SELECT DISTINCT ?GTINdesc ?GTIN ?ISBA ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit ?training
 	        FROM <http://data.europa.eu/eurostat/temp>
@@ -215,10 +215,9 @@ def classify(glob=None):
             if record not in training:
                 training.append(record)
 
-
         # production data
         start = timer()
-        sparql = SPARQLWrapper(databaseURL + '?graph-realm-id=' + publisher)
+        sparql = SPARQLWrapper(databaseURL)
         sparql.setQuery(sparqlPrefixes + """
             SELECT DISTINCT ?GTINdesc ?GTIN ?ISBAUUID ?ESBA ?ESBAdesc ?UUID ?quantity ?unit
 	        FROM <http://data.europa.eu/eurostat/temp>
