@@ -482,7 +482,7 @@ def predict(training, production, modelName="RandomForest"):
             # turnover is set to a sample value
             # as it is missing at present  from the original datasets
             # that are uploaded
-            "turnover" : int(top[0]['value'] * 100) if (top != None and len(top) > 1) else randint(0, 100)
+            "turnover" : int(top[0]['value'] * 100) if (top != None and len(top) > 0) else randint(0, 100)
         }
         if "ISBAUUID" in x:
             result['classification'] = {
