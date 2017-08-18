@@ -1,11 +1,13 @@
 # Resources generator
 
-Generates `edi ember g mu-resource ...` calls from a domain.lisp file by introspecting the resulting model.
+Generates `ember generate mu-resource ...` commands and dispatcher rules from a domain.lisp file by introspecting the resulting model.
 
 ## Example usage
 
 ```
-    dr run -v `pwd`/config/resources:/config semtech/mu-cl-resources-ember-generator
+    dr run -v [folder containing domain.lisp]:/config semtech/mu-cl-resources-ember-generator
 ```
 
-The last line of output contains the generate calls.  Run it and enjoy the new interface.
+Before exiting, the program outputs `ember generate mu-resource ...` commands and dispatcher rules. The commands have to be run in the root of an Ember project see the mu-resource blueprint documentation for more information and options.
+
+The rules can be copied and pasted in a dispatcher.ex file.

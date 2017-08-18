@@ -1,10 +1,10 @@
 (asdf:defsystem :resources-generator
-  :name "mu-cl-resources"
-  :author "Aad Versteden <madnificent@gmail.com>"
+  :name "resources-generator"
+  :author "Vincent Goossens <vincent.goossens@tenforce.com"
   :version "0.0.1"
-  :maintainer "Aad Versteden <madnificent@gmail.com>"
+  :maintainer "Vincent Goossens <vincent.goossens@tenforce.com"
   :licence "MIT"
-  :description "Snippet which outputs the generator commands to be built on top of mu-cl-resources."
+  :description "Generates ember generate commands and dispatcher rules from a domain.lisp file."
   :serial t
   :depends-on (mu-cl-resources)
   :components ((:file "packages")

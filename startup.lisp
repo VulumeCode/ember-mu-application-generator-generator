@@ -10,6 +10,7 @@
 (format t "~& >> docker setting up environment ... ~%")
 (push :docker *features*)
 (push #p"/app/" ql:*local-project-directories*)
+
 (format t "~& >> docker finished setting up environment~%")
 
 ;;; do we have base systems to load?
@@ -28,5 +29,9 @@
     (funcall (find-symbol "BOOT" name))))
 (format t "~& >> docker finished loading boot ~%")
 
+;;; run the program
 (eval (read-from-string "(ql:quickload :resources-generator)"))
+(format t "~& >> Ember generate commands ~%")
 (eval (read-from-string "(resources-generator:generate-resources)"))
+(format t "~& >> dispatcher.ex rules ~%")
+(eval (read-from-string "(resources-generator:generate-dispatchers)"))
