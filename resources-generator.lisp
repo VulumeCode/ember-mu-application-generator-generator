@@ -23,12 +23,13 @@
 ; Generate a string with an eg command for one resource
 (defun generate-resource (resource)
   "Returns the generator for the specific resource"
-  (format nil "~A ~A ~{~A ~}~:{~A:belongs-to:~A~#[~;~~~A~] ~}~:{~A:has-many:~A~#[~;~~~A~] ~}"
+  (format nil "~A ~A ~{~A ~}~:{~A:belongs-to:~A~#[~;~~~A~] ~}~:{~A:has-many:~A~#[~;~~~A~] ~} ~[~;--readonly~]"
           "ember g mu-resource" ; terminal command
           (gen-resource-name resource)  ; resource name
           (mapcar #'gen-resource-slot (mu-cl-resources::ld-properties resource)) ; its attributes
           (mapcar #'gen-resource-rel (mu-cl-resources::has-one-links  resource)) ; its belongs-to relations
           (mapcar #'gen-resource-rel (mu-cl-resources::has-many-links resource)) ; its has-many relations
+          (readonly) ; sets readonly flag for ever eg command if readonly env is set
           ))
 
 (defun gen-resource-name (resource)
@@ -56,6 +57,12 @@
   )
 )
 
+(defun readonly ()
+  (if (env-value :readonly) 1 0)
+)
+(defun env-value (setting)
+  "Returns the value of the supplied environment variable."
+  (sb-ext:posix-getenv (string-upcase (string setting))))
 
 
 ; Generate a string with a dispatcher rule for one resource
