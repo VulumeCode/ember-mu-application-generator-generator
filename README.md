@@ -23,5 +23,5 @@ The rules can be copied and pasted in a dispatcher.ex file.
 The `ember generate mu-resource ...` command takes a `--readonly` flag. To generate commands with this flag set, run the generator with the environment variable `READONLY` set to any value.
 
 ```
-    docker run -v [folder containing domain.lisp]:/config --env READONLY=t semtech/mu-cl-resources-ember-generator
+    docker run -v [folder containing domain.lisp]:/config --env READONLY=t semtech/mu-cl-resources-ember-generator 
 ```
