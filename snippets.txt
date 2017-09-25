@@ -1,0 +1,16 @@
+
+# DateTime
+
+from datetime import datetime, date, timedelta
+datetime.now().date()
+str(datetime.strptime('2016-06-21', '%Y-%m-%d').date())
+lastyear = datetime.now() - timedelta(days=365)
+
+http://vos.openlinksw.com/owiki/wiki/VOS/VirtTipsAndTricksGuideDataRangeQueries
+
+
+FILTER ( ?date >= "2017-05-22"^^xsd:dateTime).
+
+
+
+str(datetime.strptime('2016-06-21', '%Y-%m-%d').date() - timedelta(days=365))
