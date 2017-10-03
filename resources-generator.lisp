@@ -50,20 +50,21 @@
 
 (defun find-inverse (link resource)
   ;; NOTE: this method contains a workaround, as muclr:1.15.0 doesn't check whether
-  ;;       inverse relations on a predicate actually point to each other. 
+  ;;       inverse relations on a predicate actually point to each other.
   (let ((i (mu-cl-resources::inverse-links link)))
-        (if (and  i ; an inverse predicate exists
-                  (equalp ; and the relations on the predicate point to each other
-                    (mu-cl-resources::resource-name resource)
-                    (mu-cl-resources::resource-name (getf (car i) :resource))))
+        (when (and
+                i ; an inverse predicate exists
+                (equalp ; and the relations on the predicate point to each other
+                  (mu-cl-resources::resource-name link)
+                  (mu-cl-resources::resource-name (getf (car i) :resource))))
             (string-downcase (mu-cl-resources::request-path (getf (car i) :link)))
         )
   )
 )
 
 (defun readonly ()
-  (if (env-value :readonly) 1 0)
-)
+  (if (env-value :readonly) 1 0))
+
 (defun env-value (setting)
   "Returns the value of the supplied environment variable."
   (sb-ext:posix-getenv (string-upcase (string setting))))
